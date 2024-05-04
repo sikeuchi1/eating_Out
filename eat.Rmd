@@ -1,6 +1,6 @@
 ---
 title: "Eating Out"
-author: "your name here"
+author: "Shaun Ikeuchi"
 output: 
   html_document:
     number_sections: true
@@ -29,16 +29,69 @@ require(knitr)
 require(foreign)
 ```
 ```{r, eval=FALSE}
-GSS <-read.dta(file="GSSxxxx.dta")
-GSS <- droplevels(GSS)
-mydata <- select(GSS,race,age,eatout)
-mydata <- na.omit(mydata)
+GSS <-read.csv(file="GSS1996.csv")
+GSS$race = as.factor(GSS$race)
+GSS$eatout = as.factor(GSS$eatout)
+GSS$race = case_match(GSS$race, '1'~'white', '2'~'black', '3'~"other")
+GSS$eatout = case_match(GSS$eatout, '1'~'yes', '2' ~ 'no')
+
 ```
 
+## Methods
+
+'Race' and 'eatout' are categorical. Therefore, we use the cat~cat R markdown file.
+
+### Graphical Description
+## Plot BarPlots
+```{r}
 
 
+barchartGC(~eatout + race,data=GSS)
+barchartGC(~eatout + race,data=GSS, type="percent")
+
+```
+ 
+The percentage of 
+### Numerical Description
+
+```{r}
+table = xtabs(~eatout + race, data=GSS)
+print(table)
+rowPerc(table)
+colPerc(table)
+```
+
+## Inferential
+
+```{r}
+
+chisq.test(table)
+chisqtestGC(table)
+fisher.test(table)
+
+```
+ 
+Since the p-value of the fischer test is 0.0003864 which is less than 0.05, it is statistically significant.
+Since the p-value of the chi-squared test is 0.0008 which is less than 0.05, it is statistically significant. 
+
+```{r}
+dd2 <- GSS %>% group_by(eatout,race) %>% summarize(count=n()) %>% mutate(prcnt=count/sum(count))
 
 
+# the group_by followed by summarize(count=n())
+
+basicC <- ggplot(dd2,aes(x=race,y=count,fill=eatout))
+basicC + geom_bar(stat="identity",position="dodge")
+
+#Now for percentage plot
+
+basicCC <- ggplot(dd2,aes(x=race,y=prcnt*100,fill=eatout)) 
+basicCC + geom_bar(stat="identity", position = "dodge")
+```
+
+The number of white races eating out is signifcantly higher than black races eating out.
 
 
+## Conclusions
 
+There is a statistical difference the black and white race with the frequency of eating out. According to the bar chart, the number of white races eating out is 600 people comapred to the black population with only around 90 people. While the dataset of the black races is smaller, a large margin can still be seen. Furthermore, the p-value of the fischer test and the chi-squared test is less than 0.05, indicating that the null hypothesis can be rejected.  

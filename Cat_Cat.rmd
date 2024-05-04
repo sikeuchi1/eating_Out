@@ -1,0 +1,262 @@
+---
+title: "Cat~Cat"
+author: "Dr J"
+date: "Mar 7, 2021"
+output: html_document
+---
+
+
+
+
+# 2 x 2  Chisq or Fisher
+
+This is a template to serve as an example (cut and paste, change variable names)  
+we use the ucdavis1 dataset from the tigerstats package.
+
+```{r include=FALSE}
+require(tidyverse)
+require(tigerstats)
+require(knitr)
+data(ucdavis1)
+davisdata <- na.omit(ucdavis1)
+```
+
+
+### Plot barplots
+
+#### Plot barplots tigerstats way
+
+```{r}
+barchartGC(~class + Sex,data=ucdavis1)
+barchartGC(~class + Sex,data=ucdavis1, type="percent")
+
+```
+
+#### Plot barplots ggplot way
+
+```{r}
+dd2 <- davisdata %>% group_by(class,Sex) %>% summarize(count=n()) %>% mutate(prcnt=count/sum(count))
+
+
+# the group_by followed by summarize(count=n())
+
+basicC <- ggplot(dd2,aes(x=class,y=count,fill=Sex))
+basicC + geom_bar(stat="identity",position="dodge")
+
+#Now for percentage plot
+
+basicCC <- ggplot(dd2,aes(x=class,y=prcnt*100,fill=Sex)) 
+basicCC + geom_bar(stat="identity", position = "dodge")
+```
+  
+### Numerical Summaries  
+
+```{r}
+table1 <- xtabs(~class + Sex, data=davisdata)
+rowPerc(table1)
+colPerc(table1)
+```
+## Inferential  
+
+```{r}
+chisq.test(table1)
+chisqtestGC(table1)
+fisher.test(table1)
+```
+
+# 2 x 3 (other than 2x2 case)
+
+
+```{r}
+dd3 <- davisdata %>% group_by(Seat,Sex) %>% summarize(count=n()) %>% mutate(prcnt=count/sum(count))
+
+
+# the group_by followed by summarize(count=n())
+
+basicC <- ggplot(dd3,aes(x=Seat,y=count,fill=Sex))
+basicC + geom_bar(stat="identity",position="dodge")
+
+#Now for percentage plot
+
+basicCC <- ggplot(dd3,aes(x=Seat,y=prcnt*100,fill=Sex)) 
+basicCC + geom_bar(stat="identity", position = "dodge")
+```
+
+### Numerical Summaries  
+
+```{r}
+table2 <- xtabs(~Seat + Sex, data=davisdata)
+rowPerc(table2)
+colPerc(table2)
+```
+
+## Inferential  
+
+```{r}
+chisq.test(table2)
+chisqtestGC(table2)
+```
+
+## A function to run multiple fisher tests
+### Upload the fisherXY.R function then source it
+
+```{r}
+fisherXY = function(x, y, confL = 0, printAll=FALSE){
+  # Inputs: 
+  #   x: factor variable, 2 levels
+  #   y: factor variable, n levels
+  # confL: confidence level, default = 0.95
+  #        print only those tables, results if p-value < (1-confL)
+  # printAll: overide the 'print only if p-value < (1-confL), and
+  #           print all tables and fisher test results
+  #
+  # Constraint:
+  #   x and y must be same length
+  #
+  # Outputs:
+  #   All 2x2 Fisher exact tests
+  
+  if(confL<0 || confL> 1){
+    print('error: confL must be between 0 and 1')
+    return(999)
+  }
+  
+  if(!is.factor(x)) x=as.factor(x)
+  if(!is.factor(y)) y=as.factor(y)
+  
+  fisherTable = as.matrix(table(x, y))
+  cat('\ncontingency table:\n')
+  print(fisherTable)
+  cat('\n***All 2X2 tests****\n\n')
+
+  # all 2x2 tests
+  levelsY = levels(y)
+  levelsX = levels(x)
+  
+  m = length(levelsX)
+  n = length(levelsY)
+  
+  confLevel = 0.95
+  if (confL !=0 ) confLevel=confL
+  
+  for (i in 1:(m-1))
+       for(j in ((i+1):m))
+          for (k in 1:(n-1))
+             for (l in ((k+1):n)) {
+                
+                 fisherIndexX = c(i,j)
+                 fisherIndexY = c(k,l)
+                 
+                 fTempTable = as.matrix(fisherTable[fisherIndexX,
+                                        fisherIndexY])
+                 
+                 fisherTest=fisher.test(fTempTable, conf.int = TRUE, 
+                              conf.level = confLevel)
+                 
+                 if((fisherTest$p.value < (1-confLevel) ) || printAll){
+                   
+                       print(c(levelsX[i], levelsX[j]))
+                       print(c(levelsY[k], levelsY[l]))
+                       print(fTempTable)
+                       print(fisherTest)
+                       cat('\n')
+                 }
+                 
+        }
+}
+
+```
+```{r}
+fisherXY(davisdata$Sex,davisdata$Seat)
+```
+
+```{r}
+FisherTable = function(cntngcyTable, confL = 0, printAll=FALSE){
+  # Inputs:
+  # cntngcyTable: mxn contingency table
+  #
+  # To make sense of the results, the table must have rownames and
+  # column names.
+  #
+  #  Here's an example of how to set up a table
+  #
+  # suppose the research question were,
+  # "Does councelling support affect pass/fail rates in math classes?"
+  #
+  # rows are 'See a counselor', 'Counselor strong recommendation',
+  #          'Counselor recommendation', 'No Counselor Support'
+  #
+  # and the columns are 'failed' and 'passed'
+  #
+  #
+  # the data look like:
+  #                failed passed
+  # SeeCounselor     11     17
+  # StrongRec        53     28
+  # Rec              97    100
+  # NoSup           172    369
+  #
+  # To construct a data table for fisherTable:
+  # use the following R code:
+  #  >matMat = matrix(c(11,17,53,28,97,100,172,369), nrow=4,byrow = T)
+  #  >colnames(matMat)=c("failed","passed")
+  #  >rownames(matMat)=c("SeeCounselor","StrongRec", "Rec","NoSup")
+  #  >mathTab = as.table(matMat)
+  #  > print(mathTab)
+  #
+  #
+  # confL: confidence level, default = 0.95
+  #        print only those tables, results if p-value < (1-confL)
+  #
+  # printAll: overide the 'print only if p-value < (1-confL), and
+  #           print all tables and fisher test results
+  # Outputs:
+  #   All 2x2 Fisher exact tests
+ 
+  if(confL<0 || confL> 1){
+    print('error: confL must be between 0 and 1')
+    return(999)
+  }
+ 
+  cat('\ncontingency table:\n')
+  print(cntngcyTable)
+  if (printAll) {
+    cat('\n***All 2X2 tests****\n\n')
+  }else{
+    cat('\n***Print only tests with significant results***\n\n')
+  }
+ 
+  # run through all 2x2 tests
+  m = nrow(cntngcyTable)
+  n = ncol(cntngcyTable)
+ 
+  confLevel = 0.95
+  if (confL !=0 ) confLevel=confL
+ 
+  for (i in 1:(m-1))
+    for(j in ((i+1):m))
+      for (k in 1:(n-1))
+        for (l in ((k+1):n)) {
+         
+          fisherIndexX = c(i,j)
+          fisherIndexY = c(k,l)
+         
+          fTempTable = as.matrix(cntngcyTable[fisherIndexX,
+                                   fisherIndexY])
+         
+          fisherTest=fisher.test(fTempTable, conf.int = TRUE,
+                                 conf.level = confLevel)
+         
+          if((fisherTest$p.value < (1-confLevel) ) || printAll){
+           
+            print(fTempTable)
+            print(fisherTest)
+            cat('\n')
+          }
+        }
+}
+```
+
+```{r ,eval=FALSE, include=F}
+FisherTable(results,printAll = T)
+```
